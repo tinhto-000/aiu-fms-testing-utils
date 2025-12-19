@@ -17,6 +17,8 @@ from torch import distributed as dist
 from torch.fx.experimental import _config as fx_config
 from transformers import AutoTokenizer
 
+from multiprocessing import Pool
+
 from aiu_fms_testing_utils.testing.validation import (
     GoldenTokenHook,
     LogitsExtractorHook,
@@ -179,6 +181,12 @@ parser.add_argument(
     action="store_true",
     help="set to true ensure that all prompts hit the same prompt program for a given test",
 )
+parser.add_argument(
+    "--gen_validation_info_mp",
+    action="store_true",
+    help="generate cpu validation outputs MP",
+)
+
 
 args = parser.parse_args()
 
@@ -650,6 +658,56 @@ def __metric_calculator(r: torch.Tensor, t: torch.Tensor):
         )
     )
     return (cross_entropy, diff)
+
+
+def doWork(valid_prompt):
+    program_id, valid_prompt, input_ids, extra_kwargs, sample_key = valid_prompt
+
+    extra_kwargs["attn_name"] = ATTN_NAME
+    if (
+        "granite-3.3-8b-instruct" in model_variant
+        and USE_DISTRIBUTED
+        and dist.get_world_size() == 4
+    ):
+        extra_kwargs["_kvcache_num_blocks_hint"] = KVCACHE_NUM_BLOCKS_HINT
+
+    if local_rank == 0:
+        dprint(f"{os.getpid()} *** testing program {program_id} ***")
+        dprint(
+            f"{os.getpid()} program id: {program_id}, valid prompt: {valid_prompt}, input shape: {input_ids.shape}"
+        )
+
+    cpu_validation_info = extract_validation_information(
+        validation_model,
+        input_ids,
+        max_new_tokens,
+        LogitsExtractorHook(),
+        attn_algorithm="math",
+        **extra_kwargs,
+    )
+
+    cpu_validation_info.save(
+        get_validation_info_path(
+            args.validation_info_outputs_dir,
+            model_variant,
+            valid_prompt[0],
+            valid_prompt[1],
+            max_new_tokens,
+            0,
+            ATTN_NAME,
+            dtype=CPU_DTYPE,
+            sample_key=sample_key,
+        )
+    )
+
+    if local_rank == 0:
+        dprint(f"{os.getpid()} *** DONE {program_id} ***")
+        
+if args.gen_validation_info_mp:
+    with Pool(processes=8) as pool:
+        results = pool.map(doWork, valid_prompts)
+
+    exit()
 
 
 failed_cases = []
