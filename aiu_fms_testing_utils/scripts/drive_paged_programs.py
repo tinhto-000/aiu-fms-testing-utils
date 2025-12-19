@@ -662,8 +662,8 @@ def __metric_calculator(r: torch.Tensor, t: torch.Tensor):
     return (cross_entropy, diff)
 
 
-def doWork(valid_prompt):
-    program_id, valid_prompt, input_ids, extra_kwargs, sample_key = valid_prompt
+def doWork(p):
+    program_id, valid_prompt, input_ids, extra_kwargs, sample_key = p
 
     extra_kwargs["attn_name"] = ATTN_NAME
     if (

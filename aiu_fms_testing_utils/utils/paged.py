@@ -6,7 +6,7 @@ from typing import Any, Callable, List, MutableMapping, Optional, Tuple, Union
 import torch
 import fms.utils.spyre.paged  # noqa
 from aiu_fms_testing_utils.utils import get_pad_size
-
+from aiu_fms_testing_utils.utils.aiu_setup import dprint
 
 def adjust_inputs_to_batch(input_ids: torch.Tensor, **extra_kwargs):
     """
@@ -81,6 +81,9 @@ def generate(
             For example: if extra_kwargs contains position_ids and mask keys, these
             model parameters will be updated as-appropriate for each token generated.
     """
+    
+    dprint(f"{os.getpid()} enter generate()")
+    
     random.seed(0)
     if num_beams != 1:
         raise NotImplementedError("generate() does yet not support beam search")
@@ -438,6 +441,7 @@ def generate(
                         torch._dynamo.mark_dynamic(position_ids_seq_chunk, 1)
                         torch._dynamo.mark_dynamic(block_table_seq_chunk, 1)
 
+                        dprint(f"{os.getpid()} 111 calling model()")
                         logits, current_kv_cache = model(
                             input_ids_seq_chunk, **chunked_kwargs
                         )
@@ -460,6 +464,7 @@ def generate(
                     torch._dynamo.mark_dynamic(position_ids_seq, 1)
                     torch._dynamo.mark_dynamic(mask_seq, 2)
                     torch._dynamo.mark_dynamic(mask_seq, 3)
+                    dprint(f"{os.getpid()} 222 calling model()")
                     output, current_kv_cache = model(
                         input_ids_seq,
                         slot_mapping=slot_mapping_seq,
@@ -554,6 +559,7 @@ def generate(
             torch._dynamo.mark_static(kwargs["slot_mapping"], 1)  # always 1
             torch._dynamo.mark_static(kwargs["position_ids"], 1)  # always 1
 
+            dprint(f"{os.getpid()} 333 calling model()")
             logits, past_key_value_states = model(input_ids, **kwargs)
 
             # typically this is done outside of prefill/decode logic, but since this logic already exists as part of the
