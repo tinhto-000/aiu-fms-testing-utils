@@ -199,6 +199,7 @@ def generate(
             for _ in range(model.config.nlayers)
         ]
     else:
+        dprint(f"before torch.zeros() {NUM_BLOCKS}, {BLOCK_SIZE}, {kvheads}, {head_size}, {model_dtype} {model.config.nlayers}")
         kwargs["past_key_value_states"] = [
             (
                 torch.zeros(
@@ -210,6 +211,7 @@ def generate(
             )
             for _ in range(model.config.nlayers)
         ]
+        dprint("after torch.zeros()")
     kwargs["block_table"] = None
     block_numbers = [i for i in range(NUM_BLOCKS)]
     # this will ensure we don't have contiguous blocks

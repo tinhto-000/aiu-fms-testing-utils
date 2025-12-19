@@ -17,6 +17,7 @@ from torch import distributed as dist
 from torch.fx.experimental import _config as fx_config
 from transformers import AutoTokenizer
 
+import multiprocessing
 from multiprocessing import Pool
 
 from aiu_fms_testing_utils.testing.validation import (
@@ -705,7 +706,8 @@ def doWork(p):
     if local_rank == 0:
         dprint(f"{os.getpid()} *** DONE {program_id} ***")
         
-if args.gen_validation_info_mp:
+if __name__ == "__main__" and args.gen_validation_info_mp:
+    multiprocessing.set_start_method("spawn", force=True)
     with Pool(processes=8) as pool:
         results = pool.map(doWork, valid_prompts)
 
