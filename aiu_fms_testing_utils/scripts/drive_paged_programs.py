@@ -419,27 +419,29 @@ if (
     and dist.get_world_size() == 4
 ):
     extra_kwargs["_kvcache_num_blocks_hint"] = KVCACHE_NUM_BLOCKS_HINT
-warmup_model(
-    model,
-    input_ids,
-    max_new_tokens=max_new_tokens,
-    compile_dynamic_sendnn=True,
-    stagger_update_lazyhandle=args.stagger_update_lazyhandle,
-    prefill_chunk_size=args.prefill_chunk_size,
-    **extra_kwargs,
-)
+    
+if args.gen_validation_info_mp == False:
+    warmup_model(
+        model,
+        input_ids,
+        max_new_tokens=max_new_tokens,
+        compile_dynamic_sendnn=True,
+        stagger_update_lazyhandle=args.stagger_update_lazyhandle,
+        prefill_chunk_size=args.prefill_chunk_size,
+        **extra_kwargs,
+    )
 
-# do an extra inference call to workaround the issue on z/OS where the first inference
-# result is always incorrect during multi-AIU (issue 173)
-extract_validation_information(
-    model,
-    input_ids,
-    max_new_tokens,
-    post_iteration_hook=None,
-    last_n_tokens=64,
-    prefill_chunk_size=args.prefill_chunk_size,
-    **extra_kwargs,
-)
+    # do an extra inference call to workaround the issue on z/OS where the first inference
+    # result is always incorrect during multi-AIU (issue 173)
+    extract_validation_information(
+        model,
+        input_ids,
+        max_new_tokens,
+        post_iteration_hook=None,
+        last_n_tokens=64,
+        prefill_chunk_size=args.prefill_chunk_size,
+        **extra_kwargs,
+    )
 
 if USE_DISTRIBUTED:
     # wait for rank0 to be finished as it is the only one generating the criteria json
@@ -714,13 +716,7 @@ failed_cases = []
 # for each program and valid prompt (batch size, sequence length)
 for program_id, valid_prompt, input_ids, extra_kwargs, sample_key in valid_prompts:
     extra_kwargs["attn_name"] = ATTN_NAME
-    if (
-        "granite-3.3-8b-instruct" in model_variant
-        and USE_DISTRIBUTED
-        and dist.get_world_size() == 4
-    ):
-        extra_kwargs["_kvcache_num_blocks_hint"] = KVCACHE_NUM_BLOCKS_HINT
-
+    
     if local_rank == 0:
         dprint(f"*** testing program {program_id} ***")
         dprint(
