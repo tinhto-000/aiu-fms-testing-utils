@@ -722,7 +722,7 @@ if args.gen_validation_info_only:
     start = time.time()
     dprint("START quque ========>")
 
-    for v in range(valid_prompts):
+    for v in valid_prompts:
         q.put(v)
     q.join()
     elapsed = time.time() - start
