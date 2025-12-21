@@ -9,6 +9,8 @@ import random
 import time
 from itertools import dropwhile
 import re
+from queue import Queue
+from threading import Thread
 
 import torch
 from fms.models import get_model
@@ -182,9 +184,13 @@ parser.add_argument(
 parser.add_argument(
     "--gen_validation_info_only",
     action="store_true",
-    help="generate cpu validation outputs MP",
+    help="generate cpu validation outputs only",
 )
-
+parser.add_argument(
+    "--gen_validation_info_threads",
+    type=int,
+    help="number of threads during --gen_validation_info_only",
+)
 
 args = parser.parse_args()
 
@@ -659,6 +665,70 @@ def __metric_calculator(r: torch.Tensor, t: torch.Tensor):
     )
     return (cross_entropy, diff)
 
+
+def do_stuff(q):
+    while True:
+        start = time.time()
+        
+        program_id, valid_prompt, input_ids, extra_kwargs, sample_key = q.get()
+
+        extra_kwargs["attn_name"] = ATTN_NAME
+        if (
+            "granite-3.3-8b-instruct" in model_variant
+            and USE_DISTRIBUTED
+            and dist.get_world_size() == 4
+        ):
+            extra_kwargs["_kvcache_num_blocks_hint"] = KVCACHE_NUM_BLOCKS_HINT
+
+        if local_rank == 0:
+            dprint(f"*** testing program {program_id} ***")
+            dprint(
+                f"program id: {program_id}, valid prompt: {valid_prompt}, input shape: {input_ids.shape}"
+            )
+
+        cpu_validation_info = extract_validation_information(
+            validation_model,
+            input_ids,
+            max_new_tokens,
+            LogitsExtractorHook(),
+            attn_algorithm="math",
+            **extra_kwargs,
+        )
+        cpu_validation_info.save(
+            get_validation_info_path(
+                args.validation_info_outputs_dir,
+                model_variant,
+                valid_prompt[0],
+                valid_prompt[1],
+                max_new_tokens,
+                0,
+                ATTN_NAME,
+                dtype=CPU_DTYPE,
+                sample_key=sample_key,
+            )
+        )
+        
+        q.task_done()
+        elapsed = time.time() - start
+        dprint(f"program id: {program_id} finished {elapsed}s")
+
+if args.gen_validation_info_only:
+    q = Queue(maxsize=0)
+
+    for i in range(args.gen_validation_info_threads):
+        worker = Thread(target=do_stuff, args=(q,), daemon=True)
+        worker.start()
+
+    start = time.time()
+    dprint("START quque ========>")
+
+    for v in range(valid_prompts):
+        q.put(v)
+    q.join()
+    elapsed = time.time() - start
+    dprint("END quque ========> " + str(elapsed) + "s")
+
+    exit()
 
 failed_cases = []
 # for each program and valid prompt (batch size, sequence length)
