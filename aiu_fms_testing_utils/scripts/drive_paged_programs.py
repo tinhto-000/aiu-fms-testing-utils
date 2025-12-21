@@ -388,9 +388,10 @@ with stagger_region(args.stagger_load):
         **distributed_kwargs,
     )
 
-model.eval()
-fx_config.backed_size_oblivious = True
-model.compile(backend="sendnn", options={"sendnn.dynamic": True})
+if args.gen_validation_info_only == False:
+    model.eval()
+    fx_config.backed_size_oblivious = True
+    model.compile(backend="sendnn", options={"sendnn.dynamic": True})
 
 __maybe_prepare_fp8_weights(model, is_fp8)
 
