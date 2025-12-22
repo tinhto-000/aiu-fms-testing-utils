@@ -493,6 +493,7 @@ def find_validation_info_path(
             sample_key=sample_key,
         )
         # if the path is found, we are done searching and can return
+        dprint("For v" + '.'.join([str(_) for _ in loc_version_tuple[:3]]) + " validation path is: " + full_path)
         if os.path.exists(full_path):
             result_path = full_path
         # if allow version decrements, decrement the version and continue
