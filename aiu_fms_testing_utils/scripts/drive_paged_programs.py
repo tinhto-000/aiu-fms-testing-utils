@@ -186,11 +186,6 @@ parser.add_argument(
     action="store_true",
     help="generate cpu validation outputs only",
 )
-parser.add_argument(
-    "--gen_validation_info_threads",
-    type=int,
-    help="number of threads during --gen_validation_info_only",
-)
 
 args = parser.parse_args()
 
@@ -666,13 +661,11 @@ def __metric_calculator(r: torch.Tensor, t: torch.Tensor):
     )
     return (cross_entropy, diff)
 
+if args.gen_validation_info_only:
+    for program_id, valid_prompt, input_ids, extra_kwargs, sample_key in valid_prompts:
 
-def do_stuff(q):
-    while True:
         start = time.time()
-        
-        program_id, valid_prompt, input_ids, extra_kwargs, sample_key = q.get()
-
+ 
         extra_kwargs["attn_name"] = ATTN_NAME
         if (
             "granite-3.3-8b-instruct" in model_variant
@@ -709,26 +702,9 @@ def do_stuff(q):
             )
         )
         
-        q.task_done()
         elapsed = time.time() - start
         dprint(f"program id: {program_id} finished {elapsed}s")
-
-if args.gen_validation_info_only:
-    q = Queue(maxsize=0)
-
-    for i in range(args.gen_validation_info_threads):
-        worker = Thread(target=do_stuff, args=(q,), daemon=True)
-        worker.start()
-
-    start = time.time()
-    dprint("START quque ========>")
-
-    for v in valid_prompts:
-        q.put(v)
-    q.join()
-    elapsed = time.time() - start
-    dprint("END quque ========> " + str(elapsed) + "s")
-
+    
     exit()
 
 failed_cases = []
